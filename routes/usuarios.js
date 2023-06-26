@@ -1,82 +1,97 @@
 const express = require('express');
 const router = express.Router();
 
-const mysql = require('mysql2');
+const Sequelize = require('sequelize');
 
-const connection = mysql.createConnection({
-  host: '127.0.0.1', // ou localhost
-  port: 3306,
-  user: 'root',
-  password: 'root',
-  database: 'exemplo',
-  
+const { DataTypes } = Sequelize;
+
+const sequelize = new Sequelize(
+  'exemplo', // banco
+  'root', // usuario
+  'root', // senha
+  {
+    host: '127.0.0.1', // ou localhost
+    port: '3306',
+    dialect: 'mysql',
+    define: {
+      timestamps: false
+    }
+  }
+)
+
+sequelize.authenticate()
+  .then(() => {
+    console.log('Sequelize: Conectado com sucesso!');
+  })
+  .catch((error) => {
+    console.log('Sequelize: Não foi possível conectar', error);
+  });
+
+const Usuario = sequelize.define('usuarios', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true,
+    allowNull: false,
+  },
+  nome: {
+    type: DataTypes.STRING(200),
+    allowNull: true,
+    defaultValue: null,
+  },
+  idade: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    defaultValue: null,
+  },
+  data_criacao: {
+    type: DataTypes.DATE,
+    allowNull: false,
+    defaultValue: DataTypes.NOW,
+  },
 });
 
-connection.connect((error) => {
-  if (error) {
-    console.log('Não foi possível conectar', error);
-  } else {
-    console.log('Conectado com sucesso!');
+// GET /usuarios
+router.get('/', async (request, response) => {
+  try {
+    const result = await Usuario.findAll();
+    response.json(result);
+  } catch (error) {
+    console.log('Não foi possível consultar', error);
+    response.status(500).send();
   }
 });
 
-router.get('/', (request, response) => {
-
-  connection.query(
-    'SELECT * FROM usuarios',
-    (error, result) => {
-      if (error) {
-        console.log('Erro ao consultar', error);
-        response.status(500);
-        response.send();
-      } else {
-        response.json(result);
-      }
-    });
-
-});
-
-router.get('/:usuarioId', (request, response) => {
+// GET /usuarios/1
+router.get('/:usuarioId', async (request, response) => {
   const usuarioId = request.params.usuarioId;
 
-  connection.query(
-    'SELECT * FROM usuarios WHERE id = ?',
-    [usuarioId],
-    (error, result) => {
-      if (error) {
-        console.log('Erro ao consultar', error);
-        response.status(500);
-        response.send();
-      } else {
-        const usuario = result[0];
-        if (usuario) {
-          response.json(usuario);
-        } else {
-          response.status(404);
-          response.send('Usuário não encontrado');
-        }
-      }
-    });
-
+  try {
+    const result = await Usuario.findByPk(usuarioId);
+    if (result) {
+      response.json(result);
+    } else {
+      response.status(404).send('Usuário não encontrado');
+    }
+  } catch (error) {
+    console.log('Não foi possível consultar', error);
+    response.status(500).send();
+  }
 });
 
-router.post('/', (request, response) => {
+// POST /usuarios
+router.post('/', async (request, response) => {
   const usuario = {}
   usuario.nome = request.body.nome;
   usuario.idade = request.body.idade;
 
-  connection.execute(
-    'INSERT INTO usuarios (nome, idade) VALUES (?, ?)',
-    [usuario.nome, usuario.idade],
-    (error, result) => {
-      if (error) {
-        console.log('Erro ao consultar', error);
-        response.status(500).send();
-      } else {
-        response.status(201).send();
-      }
-    }
-  )
+  try {
+    await Usuario.create(usuario);
+    response.status(201).send();
+  } catch (error) {
+    console.log('Não foi possível cadastrar', error);
+    response.status(500).send();
+  } 
 });
 
 module.exports = router;
